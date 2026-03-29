@@ -1,0 +1,39 @@
+name: Kulaved CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡️ Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 🧹 Lint Check (Biome)
+        run: bun run lint
+
+      - name: 🛡️ Type Check (TSC)
+        run: bun run typecheck
+
+      - name: 🧪 Run Unit Tests
+        run: bun run test:unit
+
+      - name: 🏗️ Verify Build
+        run: bun run build
+
+      # Optional: Only run if you have a database container set up in GH Actions
+      # - name: 🗄️ Verify Database Migrations
+      #   run: bunx drizzle-kit check
