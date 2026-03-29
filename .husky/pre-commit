@@ -1,0 +1,9 @@
+echo "🛡️  Running Pre-commit Checks..."
+
+# 1. Check for Lint/Formatting (Ensures 100% clean code)
+bun run lint || { echo "❌ Linting failed. Run 'bun lint:fix' to resolve."; exit 1; }
+
+# 2. Run Unit Tests (Ensures logic is sound)
+bun test ./tests/unit || { echo "❌ Unit tests failed. Commit aborted."; exit 1; }
+
+echo "✅ All checks passed. Committing..."

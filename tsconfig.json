@@ -2,8 +2,10 @@
   "compilerOptions": {
     // Path Mapping
     "baseUrl": ".",
+    "types": ["bun-types", "k6"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@test/*": ["./tests/*"]
     },
 
     // Environment setup & latest features
@@ -31,5 +33,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
 }

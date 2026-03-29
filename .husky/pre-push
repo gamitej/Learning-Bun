@@ -1,0 +1,12 @@
+# Get the current branch name
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+echo "🚀 Running Final Type Check on [$current_branch]..."
+
+bun x tsc --noEmit --skipLibCheck || { 
+  echo "❌ Type errors found in project! Push aborted."
+  echo "💡 Tip: Check your @/ aliases and interface definitions."
+  exit 1 
+}
+
+echo "✅ Type Check Passed. Pushing to remote..."
