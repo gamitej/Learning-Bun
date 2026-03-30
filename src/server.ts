@@ -1,6 +1,6 @@
+import { logger } from "@/utils/logger";
 import { Hono } from "hono";
 import { logger as honoLogger } from "hono/logger";
-import { logger } from "@/utils/logger";
 import todoRoutes from "./routes/todo.routes";
 
 const app = new Hono();

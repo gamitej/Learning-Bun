@@ -1,7 +1,7 @@
+import { TodoController } from "@/controller/todo.controller";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { TodoController } from "@/controller/todo.controller";
 
 const todoRoutes = new Hono();
 

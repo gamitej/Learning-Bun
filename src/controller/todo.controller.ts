@@ -1,5 +1,5 @@
-import type { Context } from "hono";
 import { logger } from "@/utils/logger";
+import type { Context } from "hono";
 
 export const TodoController = {
   getAll: (c: Context) => {

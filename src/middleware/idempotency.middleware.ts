@@ -1,8 +1,8 @@
-import { and, eq, gt } from "drizzle-orm";
-import type { Context, Next } from "hono";
 import { env } from "@/config/env";
 import { db, idempotency } from "@/database";
 import logger from "@/utils/logger";
+import { and, eq, gt } from "drizzle-orm";
+import type { Context, Next } from "hono";
 
 export const idempotencyMiddleware = async (c: Context, next: Next) => {
   if (["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
@@ -23,7 +23,7 @@ export const idempotencyMiddleware = async (c: Context, next: Next) => {
       ),
     });
 
-    if (existing && existing.response) {
+    if (existing?.response) {
       logger.info({ key }, "🎯 Idempotency Hit: Returning cached response");
       return c.json(existing.response, 200);
     }
