@@ -1,4 +1,4 @@
-name: Kulaved CI Pipeline
+name: Project CI Pipeline
 
 on:
   push:
