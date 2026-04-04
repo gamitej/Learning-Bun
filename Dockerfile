@@ -7,4 +7,4 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 EXPOSE 3000
-CMD ["bun", "run", "src/server.ts"]
+CMD ["sh", "-c", "bunx drizzle-kit push --config=src/config/drizzle.config.ts --force && bun run src/server.ts"]
