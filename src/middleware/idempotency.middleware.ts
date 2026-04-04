@@ -51,11 +51,9 @@ export const idempotencyMiddleware = async (c: Context, next: Next) => {
     c.set("idempotencyKey", key);
 
     await next();
-  } catch (err: any) {
-    logger.error(
-      { error: err.message, key },
-      "❌ Idempotency Middleware Error",
-    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ error: msg, key }, "❌ Idempotency Middleware Error");
     return await next();
   }
 };

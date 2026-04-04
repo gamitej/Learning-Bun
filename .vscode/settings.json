@@ -6,9 +6,11 @@
     "source.organizeImports.biome": "explicit"
   },
 
+  // 1. Disable legacy formatters to prevent conflicts
   "eslint.enable": false,
   "prettier.enable": false,
 
+  // 2. Explicitly map Biome to your languages
   "[typescript]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
@@ -20,5 +22,17 @@
   },
   "[jsonc]": {
     "editor.defaultFormatter": "biomejs.biome"
+  },
+  "js/ts.suggest.autoImports": true,
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+  "js/ts.preferences.importModuleSpecifierEnding": "minimal",
+
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.parameterHints.enabled": true,
+  "editor.suggestSelection": "first",
+
+  "tailwindCSS.includeLanguages": {
+    "typescriptreact": "typescriptreact"
   }
 }

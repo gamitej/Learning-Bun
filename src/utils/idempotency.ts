@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 export async function storeResponse(
   idempotencyKey: string,
-  responsePayload: any,
+  responsePayload: unknown,
 ): Promise<void> {
   if (!idempotencyKey) return;
 
@@ -22,9 +22,10 @@ export async function storeResponse(
         "Attempted to store response for non-existent key",
       );
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     logger.error(
-      { error: err.message, idempotencyKey },
+      { error: msg, idempotencyKey },
       "Failed to update idempotency record",
     );
   }
@@ -41,9 +42,10 @@ export async function clearRecord(idempotencyKey: string): Promise<void> {
     await db
       .delete(idempotency)
       .where(eq(idempotency.idempotencyKey, idempotencyKey));
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     logger.error(
-      { error: err.message, idempotencyKey },
+      { error: msg, idempotencyKey },
       "Failed to cleanup idempotency record",
     );
   }

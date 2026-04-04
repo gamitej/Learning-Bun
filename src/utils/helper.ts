@@ -11,9 +11,13 @@ export const sendResponse = async (
   statusCode: ContentfulStatusCode,
   success: boolean,
   message: string,
-  data: any = null,
+  data: unknown = null,
 ) => {
-  const payload = { success, message, data };
+  const payload: { success: boolean; message: string; data?: unknown } = {
+    success,
+    message,
+  };
+  if (data !== null) payload.data = data;
 
   const key = c.get("idempotencyKey");
 
@@ -32,7 +36,7 @@ export const sendError = async (
   c: Context,
   statusCode: ContentfulStatusCode,
   message: string,
-  errors: any = null,
+  errors: unknown = null,
   options: ResponseOptions = {},
 ) => {
   const key = c.get("idempotencyKey");
@@ -41,12 +45,17 @@ export const sendError = async (
     await clearRecord(key);
   }
 
-  const payload = {
+  const payload: {
+    success: false;
+    message: string;
+    errors?: unknown;
+    extraMessage?: string;
+  } = {
     success: false,
     message,
-    ...(errors && { errors }),
-    ...(options.extraMessage && { extraMessage: options.extraMessage }),
   };
+  if (errors) payload.errors = errors;
+  if (options.extraMessage) payload.extraMessage = options.extraMessage;
 
   return c.json(payload, statusCode);
 };
