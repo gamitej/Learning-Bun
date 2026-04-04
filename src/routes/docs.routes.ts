@@ -1,9 +1,6 @@
-import openapi from "@/openapi";
 import { Hono } from "hono";
 
 const docs = new Hono();
-
-docs.get("/openapi.json", (c) => c.json(openapi));
 
 docs.get("/", (c) =>
   c.html(`<!DOCTYPE html>

@@ -4,6 +4,9 @@ services:
     ports:
       - "${PORT}:${PORT}"
     env_file: .env
+    volumes:
+      - ./src:/app/src
+    command: sh -c "bunx drizzle-kit push --config=src/config/drizzle.config.ts --force && bun --hot src/server.ts"
     depends_on:
       database:
         condition: service_healthy

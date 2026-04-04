@@ -1,15 +1,62 @@
 import { AuthController } from "@/controller/auth.controller";
-import { validate } from "@/middleware/validation.middleware";
-import { loginSchema, signupSchema } from "@/validation";
-import { Hono } from "hono";
+import {
+  authResponseSchema,
+  errorResponseSchema,
+  loginSchema,
+  signupResponseSchema,
+  signupSchema,
+} from "@/validation";
+import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 
-const authRoutes = new Hono();
+const authRoutes = new OpenAPIHono();
 
-authRoutes.post(
-  "/signup",
-  validate("json", signupSchema),
-  AuthController.signup,
-);
-authRoutes.post("/login", validate("json", loginSchema), AuthController.login);
+const signupRoute = createRoute({
+  method: "post",
+  path: "/signup",
+  tags: ["Auth"],
+  summary: "Signup",
+  request: {
+    body: {
+      content: { "application/json": { schema: signupSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      description: "User created",
+      content: { "application/json": { schema: signupResponseSchema } },
+    },
+    500: {
+      description: "Creation failed",
+      content: { "application/json": { schema: errorResponseSchema } },
+    },
+  },
+});
+
+const loginRoute = createRoute({
+  method: "post",
+  path: "/login",
+  tags: ["Auth"],
+  summary: "Login",
+  request: {
+    body: {
+      content: { "application/json": { schema: loginSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: "Login successful",
+      content: { "application/json": { schema: authResponseSchema } },
+    },
+    401: {
+      description: "Invalid credentials",
+      content: { "application/json": { schema: errorResponseSchema } },
+    },
+  },
+});
+
+authRoutes.openapi(signupRoute, AuthController.signup);
+authRoutes.openapi(loginRoute, AuthController.login);
 
 export default authRoutes;

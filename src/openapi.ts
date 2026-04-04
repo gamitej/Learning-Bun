@@ -6,6 +6,10 @@ export const openapi = {
     description: "API for user-authenticated todo management",
   },
   servers: [{ url: "/api" }],
+  tags: [
+    { name: "Auth", description: "Authentication endpoints" },
+    { name: "Todo", description: "Todo management endpoints" },
+  ],
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
@@ -37,6 +41,7 @@ export const openapi = {
   paths: {
     "/auth/signup": {
       post: {
+        tags: ["Auth"],
         summary: "Signup",
         requestBody: {
           required: true,
@@ -51,6 +56,7 @@ export const openapi = {
     },
     "/auth/login": {
       post: {
+        tags: ["Auth"],
         summary: "Login",
         requestBody: {
           required: true,
@@ -74,6 +80,7 @@ export const openapi = {
     },
     "/todos": {
       get: {
+        tags: ["Todo"],
         summary: "List todos",
         security: [{ bearerAuth: [] }],
         responses: {
@@ -88,6 +95,7 @@ export const openapi = {
         },
       },
       post: {
+        tags: ["Todo"],
         summary: "Create todo",
         security: [{ bearerAuth: [] }],
         requestBody: {
@@ -109,6 +117,7 @@ export const openapi = {
         { name: "id", in: "path", required: true, schema: { type: "integer" } },
       ],
       get: {
+        tags: ["Todo"],
         summary: "Get todo",
         security: [{ bearerAuth: [] }],
         responses: {
@@ -117,6 +126,7 @@ export const openapi = {
         },
       },
       put: {
+        tags: ["Todo"],
         summary: "Update todo",
         security: [{ bearerAuth: [] }],
         requestBody: {
@@ -125,6 +135,7 @@ export const openapi = {
         responses: { "200": { description: "OK" } },
       },
       delete: {
+        tags: ["Todo"],
         summary: "Delete todo",
         security: [{ bearerAuth: [] }],
         responses: { "200": { description: "OK" } },
