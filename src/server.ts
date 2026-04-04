@@ -1,21 +1,38 @@
+import { sendError } from "@/utils/helper";
 import { logger } from "@/utils/logger";
 import { Hono } from "hono";
 import { logger as honoLogger } from "hono/logger";
-import authRoutes from "./routes/auth.routes";
-import docsRoutes from "./routes/docs.routes";
-import todoRoutes from "./routes/todo.routes";
+import routes from "./routes";
 
 const app = new Hono();
 
 app.use("*", honoLogger());
 
-app.route("/api/todos", todoRoutes);
-app.route("/api/auth", authRoutes);
-app.route("/api/docs", docsRoutes);
+routes.registerRoutes(app);
 
-app.onError((err, res) => {
-  logger.error({ err: err.message, stack: err.stack }, "Server Error");
-  return res.json({ error: "Internal Server Error" }, 500);
+app.onError((err, c) => {
+  logger.error(
+    {
+      err: err.message,
+      stack: err.stack,
+      path: c.req.path,
+    },
+    "Global Error Caught",
+  );
+
+  const errorCode = (err as any).code;
+
+  if (errorCode === "23505") {
+    return sendError(c, 409, "Record already exists.");
+  }
+
+  if (errorCode === "23514") {
+    return sendError(c, 400, "Validation check failed: Invalid data range.");
+  }
+
+  const errorMessage = "An unexpected error occurred. Please try again.";
+
+  return sendError(c, 500, errorMessage);
 });
 
 export default {
