@@ -1,6 +1,7 @@
 import { env } from "@/config/env";
 import { db, idempotency } from "@/database";
-import logger from "@/utils/logger";
+import { Errors } from "@/utils/errors";
+import { logger } from "@/utils/logger";
 import { and, eq, gt } from "drizzle-orm";
 import type { Context, Next } from "hono";
 
@@ -32,9 +33,9 @@ export const idempotencyMiddleware = async (c: Context, next: Next) => {
       return c.json(
         {
           success: false,
-          message: "Request is already being processed. Please wait.",
+          message: Errors.REQUEST_IN_FLIGHT.message,
         },
-        409,
+        Errors.REQUEST_IN_FLIGHT.status,
       );
     }
 

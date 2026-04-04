@@ -1,4 +1,5 @@
 import { db, todos } from "@/database";
+import { Errors } from "@/utils/errors";
 import { sendError, sendResponse } from "@/utils/helper";
 import { logger } from "@/utils/logger";
 import { and, eq } from "drizzle-orm";
@@ -10,7 +11,12 @@ export const TodoController = {
    */
   getAll: (async (c) => {
     const user = c.get("user");
-    if (!user) return sendError(c, 401, "Unauthorized");
+    if (!user)
+      return sendError(
+        c,
+        Errors.UNAUTHORIZED.status,
+        Errors.UNAUTHORIZED.message,
+      );
 
     const items = await db
       .select()
@@ -25,17 +31,27 @@ export const TodoController = {
    */
   create: (async (c) => {
     const user = c.get("user");
-    if (!user) return sendError(c, 401, "Unauthorized");
+    if (!user)
+      return sendError(
+        c,
+        Errors.UNAUTHORIZED.status,
+        Errors.UNAUTHORIZED.message,
+      );
 
-    const { task, title } = await c.req.json();
-    const todoTitle = title || task || "Untitled task";
+    const { task, title } = c.req.valid("json" as never);
+    const todoTitle = title || task;
 
     const [todo] = await db
       .insert(todos)
       .values({ title: todoTitle, user_id: user.id })
       .returning();
 
-    if (!todo) return sendError(c, 500, "Failed to create todo");
+    if (!todo)
+      return sendError(
+        c,
+        Errors.TODO_CREATION_FAILED.status,
+        Errors.TODO_CREATION_FAILED.message,
+      );
 
     logger.info({ todoId: todo.id }, "New todo created");
     return sendResponse(c, 201, true, "Todo created", todo);
@@ -46,10 +62,14 @@ export const TodoController = {
    */
   getOne: (async (c) => {
     const user = c.get("user");
-    if (!user) return sendError(c, 401, "Unauthorized");
+    if (!user)
+      return sendError(
+        c,
+        Errors.UNAUTHORIZED.status,
+        Errors.UNAUTHORIZED.message,
+      );
 
-    const id = Number(c.req.param("id"));
-    if (Number.isNaN(id)) return sendError(c, 400, "Invalid ID format");
+    const { id } = c.req.valid("param" as never);
 
     const [todo] = await db
       .select()
@@ -57,7 +77,12 @@ export const TodoController = {
       .where(and(eq(todos.id, id), eq(todos.user_id, user.id)))
       .limit(1);
 
-    if (!todo) return sendError(c, 404, "Todo not found");
+    if (!todo)
+      return sendError(
+        c,
+        Errors.TODO_NOT_FOUND.status,
+        Errors.TODO_NOT_FOUND.message,
+      );
 
     return sendResponse(c, 200, true, "Todo fetched", todo);
   }) as Handler,
@@ -67,10 +92,19 @@ export const TodoController = {
    */
   update: (async (c) => {
     const user = c.get("user");
-    if (!user) return sendError(c, 401, "Unauthorized");
+    if (!user)
+      return sendError(
+        c,
+        Errors.UNAUTHORIZED.status,
+        Errors.UNAUTHORIZED.message,
+      );
 
-    const id = Number(c.req.param("id"));
-    const payload = await c.req.json();
+    const { id } = c.req.valid("param" as never);
+    const { title, completed } = c.req.valid("json" as never);
+
+    const payload: { title?: string; completed?: boolean } = {};
+    if (title !== undefined) payload.title = title;
+    if (completed !== undefined) payload.completed = completed;
 
     const [todo] = await db
       .update(todos)
@@ -78,7 +112,12 @@ export const TodoController = {
       .where(and(eq(todos.id, id), eq(todos.user_id, user.id)))
       .returning();
 
-    if (!todo) return sendError(c, 404, "Todo not found");
+    if (!todo)
+      return sendError(
+        c,
+        Errors.TODO_NOT_FOUND.status,
+        Errors.TODO_NOT_FOUND.message,
+      );
 
     return sendResponse(c, 200, true, "Todo updated", todo);
   }) as Handler,
@@ -88,16 +127,26 @@ export const TodoController = {
    */
   delete: (async (c) => {
     const user = c.get("user");
-    if (!user) return sendError(c, 401, "Unauthorized");
+    if (!user)
+      return sendError(
+        c,
+        Errors.UNAUTHORIZED.status,
+        Errors.UNAUTHORIZED.message,
+      );
 
-    const id = Number(c.req.param("id"));
+    const { id } = c.req.valid("param" as never);
 
     const [todo] = await db
       .delete(todos)
       .where(and(eq(todos.id, id), eq(todos.user_id, user.id)))
       .returning();
 
-    if (!todo) return sendError(c, 404, "Todo not found");
+    if (!todo)
+      return sendError(
+        c,
+        Errors.TODO_NOT_FOUND.status,
+        Errors.TODO_NOT_FOUND.message,
+      );
 
     logger.info({ todoId: id, userId: user.id }, "Todo deleted");
     return sendResponse(c, 200, true, "Todo deleted", todo);

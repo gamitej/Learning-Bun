@@ -1,28 +1,15 @@
 import { AuthController } from "@/controller/auth.controller";
-import { zValidator } from "@hono/zod-validator";
+import { validate } from "@/middleware/validation.middleware";
+import { loginSchema, signupSchema } from "@/validation";
 import { Hono } from "hono";
-import { z } from "zod";
 
 const authRoutes = new Hono();
 
-const signupSchema = z.object({
-  username: z.string().min(3),
-  password: z.string().min(6),
-});
-const loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
-});
-
 authRoutes.post(
   "/signup",
-  zValidator("json", signupSchema),
+  validate("json", signupSchema),
   AuthController.signup,
 );
-authRoutes.post(
-  "/login",
-  zValidator("json", loginSchema),
-  AuthController.login,
-);
+authRoutes.post("/login", validate("json", loginSchema), AuthController.login);
 
 export default authRoutes;

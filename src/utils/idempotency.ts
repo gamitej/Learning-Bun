@@ -1,5 +1,5 @@
 import { db, idempotency } from "@/database";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 import { eq } from "drizzle-orm";
 
 export async function storeResponse(

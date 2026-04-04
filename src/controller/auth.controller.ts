@@ -1,8 +1,9 @@
 import { db } from "@/database";
 import { UserHelpers } from "@/database/schema";
 import { signJwt } from "@/utils/auth";
+import { Errors } from "@/utils/errors";
 import { sendError, sendResponse } from "@/utils/helper";
-import logger from "@/utils/logger";
+import { logger } from "@/utils/logger";
 import type { Handler } from "hono";
 
 export const AuthController = {
@@ -10,11 +11,7 @@ export const AuthController = {
    * =================== SIGNUP ===================
    */
   signup: (async (c) => {
-    const { username, password } = await c.req.json();
-
-    if (!username || !password) {
-      return sendError(c, 400, "Missing username or password");
-    }
+    const { username, password } = c.req.valid("json" as never);
 
     const user = await UserHelpers.create(db, {
       username,
@@ -22,7 +19,11 @@ export const AuthController = {
     });
 
     if (!user) {
-      return sendError(c, 500, "Failed to create user");
+      return sendError(
+        c,
+        Errors.USER_CREATION_FAILED.status,
+        Errors.USER_CREATION_FAILED.message,
+      );
     }
 
     logger.info({ userId: user.id, username: user.username }, "User created");
@@ -37,17 +38,17 @@ export const AuthController = {
    * =================== LOGIN ====================
    */
   login: (async (c) => {
-    const { username, password } = await c.req.json();
-
-    if (!username || !password) {
-      return sendError(c, 400, "Missing username or password");
-    }
+    const { username, password } = c.req.valid("json" as never);
 
     const user = await UserHelpers.verify(db, username, password);
 
     if (!user) {
       logger.warn({ username }, "Invalid login attempt");
-      return sendError(c, 401, "Invalid credentials");
+      return sendError(
+        c,
+        Errors.INVALID_CREDENTIALS.status,
+        Errors.INVALID_CREDENTIALS.message,
+      );
     }
 
     const token = await signJwt({ sub: user.id, username: user.username });

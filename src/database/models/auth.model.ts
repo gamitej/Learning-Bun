@@ -1,6 +1,7 @@
 import { hashPassword, verifyPassword } from "@/utils/auth";
 import { eq } from "drizzle-orm";
 import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -9,11 +10,13 @@ export const users = pgTable("users", {
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
+type DbInstance = PostgresJsDatabase<Record<string, unknown>>;
+
 export const UserHelpers = {
-  /**
-   * Creates a new user with a hashed password
-   */
-  create: async (db: any, data: { username: string; passwordRaw: string }) => {
+  create: async (
+    db: DbInstance,
+    data: { username: string; passwordRaw: string },
+  ) => {
     const password_hash = await hashPassword(data.passwordRaw);
 
     const [user] = await db
@@ -27,10 +30,7 @@ export const UserHelpers = {
     return user;
   },
 
-  /**
-   * Finds a user and validates their password
-   */
-  verify: async (db: any, username: string, passwordRaw: string) => {
+  verify: async (db: DbInstance, username: string, passwordRaw: string) => {
     const [user] = await db
       .select()
       .from(users)

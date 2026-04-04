@@ -1,43 +1,60 @@
-import { sendError } from "@/utils/helper";
+import { env } from "@/config/env";
+import { globalErrorHandler } from "@/utils/errors";
 import { logger } from "@/utils/logger";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
+import { startDatabase, stopDatabase } from "./database";
 import routes from "./routes";
 
 const app = new Hono();
 
+/**
+ * Middleware
+ */
+app.use("*", cors());
 app.use("*", honoLogger());
 
+/**
+ * Routes
+ */
 routes.registerRoutes(app);
 
-app.onError((err, c) => {
-  logger.error(
-    {
-      err: err.message,
-      stack: err.stack,
-      path: c.req.path,
-    },
-    "Global Error Caught",
-  );
+/**
+ * Global Error Handler
+ */
+app.onError(globalErrorHandler);
 
-  const errorCode = (err as any).code;
-
-  if (errorCode === "23505") {
-    return sendError(c, 409, "Record already exists.");
+/**
+ * Graceful Shutdown
+ */
+const shutdown = async () => {
+  logger.info("Shutting down server");
+  try {
+    await stopDatabase();
+  } catch (e) {
+    logger.error({ err: e }, "Error during shutdown");
   }
-
-  if (errorCode === "23514") {
-    return sendError(c, 400, "Validation check failed: Invalid data range.");
-  }
-
-  const errorMessage = "An unexpected error occurred. Please try again.";
-
-  return sendError(c, 500, errorMessage);
-});
-
-export default {
-  port: 3000,
-  fetch: app.fetch,
+  process.exit(0);
 };
 
-logger.info("🚀 Bun server running at http://localhost:3000");
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+/**
+ * Start Server
+ */
+(async () => {
+  try {
+    await startDatabase();
+    logger.info(`Server running at http://localhost:${env.PORT}`);
+  } catch (err) {
+    logger.error({ err }, "Failed to start database");
+    process.exit(1);
+  }
+})();
+
+export default {
+  port: env.PORT,
+  fetch: app.fetch,
+};

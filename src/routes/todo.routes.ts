@@ -1,24 +1,39 @@
 import { TodoController } from "@/controller/todo.controller";
 import authMiddleware from "@/middleware/auth.middleware";
-import { zValidator } from "@hono/zod-validator";
+import { idempotencyMiddleware } from "@/middleware/idempotency.middleware";
+import { validate } from "@/middleware/validation.middleware";
+import {
+  idParamSchema,
+  todoCreateSchema,
+  todoUpdateSchema,
+} from "@/validation";
 import { Hono } from "hono";
-import { z } from "zod";
 
 const todoRoutes = new Hono();
-
-const todoSchema = z.object({
-  task: z.string().min(3, "Task must be at least 3 chars long").optional(),
-  title: z.string().min(1).optional(),
-  completed: z.boolean().optional(),
-});
 
 todoRoutes.use("*", authMiddleware);
 
 todoRoutes.get("/", TodoController.getAll);
-todoRoutes.post("/", zValidator("json", todoSchema), TodoController.create);
+todoRoutes.post(
+  "/",
+  idempotencyMiddleware,
+  validate("json", todoCreateSchema),
+  TodoController.create,
+);
 
-todoRoutes.get("/:id", TodoController.getOne);
-todoRoutes.put("/:id", zValidator("json", todoSchema), TodoController.update);
-todoRoutes.delete("/:id", TodoController.delete);
+todoRoutes.get("/:id", validate("param", idParamSchema), TodoController.getOne);
+todoRoutes.put(
+  "/:id",
+  validate("param", idParamSchema),
+  idempotencyMiddleware,
+  validate("json", todoUpdateSchema),
+  TodoController.update,
+);
+todoRoutes.delete(
+  "/:id",
+  validate("param", idParamSchema),
+  idempotencyMiddleware,
+  TodoController.delete,
+);
 
 export default todoRoutes;
