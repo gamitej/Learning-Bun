@@ -1,5 +1,5 @@
 import { env } from "@/config/env";
-import { globalErrorHandler } from "@/utils/errors";
+import { Errors, globalErrorHandler } from "@/utils/errors";
 import { logger } from "@/utils/logger";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
@@ -7,7 +7,23 @@ import { logger as honoLogger } from "hono/logger";
 import { startDatabase, stopDatabase } from "./database";
 import routes from "./routes";
 
-const app = new OpenAPIHono();
+const app = new OpenAPIHono({
+  defaultHook: (result, c) => {
+    if (!result.success) {
+      return c.json(
+        {
+          success: false,
+          message: Errors.VALIDATION_FAILED.message,
+          errors: result.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+        Errors.VALIDATION_FAILED.status as any,
+      );
+    }
+  },
+});
 
 /**
  * Middleware

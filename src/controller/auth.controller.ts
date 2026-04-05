@@ -1,17 +1,18 @@
 import { db } from "@/database";
 import { UserHelpers } from "@/database/schema";
+import type { loginRoute, signupRoute } from "@/routes/auth.routes";
 import { signJwt } from "@/utils/auth";
 import { Errors } from "@/utils/errors";
 import { sendError, sendResponse } from "@/utils/helper";
 import { logger } from "@/utils/logger";
-import type { Handler } from "hono";
+import type { RouteHandler } from "@hono/zod-openapi";
 
 export const AuthController = {
   /**
    * =================== SIGNUP ===================
    */
   signup: (async (c) => {
-    const { username, password } = c.req.valid("json" as never);
+    const { username, password } = c.req.valid("json");
 
     const user = await UserHelpers.create(db, {
       username,
@@ -32,13 +33,13 @@ export const AuthController = {
       id: user.id,
       username: user.username,
     });
-  }) as Handler,
+  }) as RouteHandler<typeof signupRoute>,
 
   /**
    * =================== LOGIN ====================
    */
   login: (async (c) => {
-    const { username, password } = c.req.valid("json" as never);
+    const { username, password } = c.req.valid("json");
 
     const user = await UserHelpers.verify(db, username, password);
 
@@ -56,5 +57,5 @@ export const AuthController = {
     logger.info({ userId: user.id }, "User logged in");
 
     return sendResponse(c, 200, true, "Login successful", { token });
-  }) as Handler,
+  }) as RouteHandler<typeof loginRoute>,
 };

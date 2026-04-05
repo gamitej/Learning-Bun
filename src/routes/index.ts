@@ -37,7 +37,7 @@ export function registerRoutes(app: OpenAPIHono) {
       version: "1.0.0",
       description: "API for user-authenticated todo management",
     },
-    servers: [{ url: "/api" }],
+    servers: [{ url: "/" }],
     tags: [
       { name: "Auth", description: "Authentication endpoints" },
       { name: "Todo", description: "Todo management endpoints" },

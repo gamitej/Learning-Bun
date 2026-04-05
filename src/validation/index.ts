@@ -1,5 +1,9 @@
 import { z } from "@hono/zod-openapi";
 
+/**
+ * ================== AUTH SCHEMAS ===================
+ */
+
 export const signupSchema = z
   .object({
     username: z
@@ -19,30 +23,6 @@ export const loginSchema = z
     password: z.string().min(1, "Password is required"),
   })
   .openapi("UserLogin");
-
-export const todoCreateSchema = z
-  .object({
-    task: z.string().min(3, "Task must be at least 3 chars long").optional(),
-    title: z.string().min(1, "Title is required").optional(),
-  })
-  .refine((data) => data.task || data.title, {
-    message: "Either 'task' or 'title' must be provided",
-  });
-
-export const todoUpdateSchema = z
-  .object({
-    title: z.string().min(1, "Title cannot be empty").optional(),
-    completed: z.boolean().optional(),
-  })
-  .refine((data) => data.title !== undefined || data.completed !== undefined, {
-    message: "At least one field (title or completed) must be provided",
-  });
-
-export const idParamSchema = z
-  .object({
-    id: z.coerce.number().int().positive("ID must be a positive integer"),
-  })
-  .openapi("IdParam");
 
 export const authResponseSchema = z
   .object({
@@ -64,6 +44,34 @@ export const signupResponseSchema = z
     }),
   })
   .openapi("SignupResponse");
+
+/**
+ * ================== TODO SCHEMAS ===================
+ */
+
+export const todoCreateSchema = z
+  .object({
+    task: z.string().min(3, "Task must be at least 3 chars long"),
+    title: z.string().min(1, "Title is required").optional(),
+  })
+  .refine((data) => data.task || data.title, {
+    message: "Either 'task' or 'title' must be provided",
+  });
+
+export const todoUpdateSchema = z
+  .object({
+    title: z.string().min(1, "Title cannot be empty").optional(),
+    completed: z.boolean().optional(),
+  })
+  .refine((data) => data.title !== undefined || data.completed !== undefined, {
+    message: "At least one field (title or completed) must be provided",
+  });
+
+export const idParamSchema = z
+  .object({
+    id: z.coerce.number().int().positive("ID must be a positive integer"),
+  })
+  .openapi("IdParam");
 
 export const todoSchema = z
   .object({

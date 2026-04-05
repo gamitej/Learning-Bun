@@ -1,13 +1,20 @@
 import { db, todos } from "@/database";
+import type {
+  createTodoRoute,
+  deleteRoute,
+  getAllRoute,
+  getOneRoute,
+  updateRoute,
+} from "@/routes/todo.routes";
 import { Errors } from "@/utils/errors";
 import { sendError, sendResponse } from "@/utils/helper";
 import { logger } from "@/utils/logger";
+import type { RouteHandler } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
-import type { Handler } from "hono";
 
 export const TodoController = {
   /**
-   * =================== GET ALL TODOS ===================
+   * ================== GET ALL TODOS ==================
    */
   getAll: (async (c) => {
     const user = c.get("user");
@@ -24,7 +31,7 @@ export const TodoController = {
       .where(eq(todos.user_id, user.id));
 
     return sendResponse(c, 200, true, "Todos fetched", items);
-  }) as Handler,
+  }) as RouteHandler<typeof getAllRoute>,
 
   /**
    * =================== CREATE TODO ===================
@@ -38,7 +45,7 @@ export const TodoController = {
         Errors.UNAUTHORIZED.message,
       );
 
-    const { task, title } = c.req.valid("json" as never);
+    const { task, title } = c.req.valid("json");
     const todoTitle = title || task;
 
     const [todo] = await db
@@ -55,7 +62,7 @@ export const TodoController = {
 
     logger.info({ todoId: todo.id }, "New todo created");
     return sendResponse(c, 201, true, "Todo created", todo);
-  }) as Handler,
+  }) as RouteHandler<typeof createTodoRoute>,
 
   /**
    * =================== GET ONE TODO ===================
@@ -69,7 +76,7 @@ export const TodoController = {
         Errors.UNAUTHORIZED.message,
       );
 
-    const { id } = c.req.valid("param" as never);
+    const { id } = c.req.valid("param");
 
     const [todo] = await db
       .select()
@@ -85,7 +92,7 @@ export const TodoController = {
       );
 
     return sendResponse(c, 200, true, "Todo fetched", todo);
-  }) as Handler,
+  }) as RouteHandler<typeof getOneRoute>,
 
   /**
    * =================== UPDATE TODO ===================
@@ -99,10 +106,10 @@ export const TodoController = {
         Errors.UNAUTHORIZED.message,
       );
 
-    const { id } = c.req.valid("param" as never);
-    const { title, completed } = c.req.valid("json" as never);
+    const { id } = c.req.valid("param");
+    const { title, completed } = c.req.valid("json");
 
-    const payload: { title?: string; completed?: boolean } = {};
+    const payload: Partial<typeof todos.$inferInsert> = { title, completed };
     if (title !== undefined) payload.title = title;
     if (completed !== undefined) payload.completed = completed;
 
@@ -120,7 +127,7 @@ export const TodoController = {
       );
 
     return sendResponse(c, 200, true, "Todo updated", todo);
-  }) as Handler,
+  }) as RouteHandler<typeof updateRoute>,
 
   /**
    * =================== DELETE TODO ===================
@@ -134,7 +141,7 @@ export const TodoController = {
         Errors.UNAUTHORIZED.message,
       );
 
-    const { id } = c.req.valid("param" as never);
+    const { id } = c.req.valid("param");
 
     const [todo] = await db
       .delete(todos)
@@ -150,5 +157,5 @@ export const TodoController = {
 
     logger.info({ todoId: id, userId: user.id }, "Todo deleted");
     return sendResponse(c, 200, true, "Todo deleted", todo);
-  }) as Handler,
+  }) as RouteHandler<typeof deleteRoute>,
 };

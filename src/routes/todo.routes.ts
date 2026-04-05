@@ -4,22 +4,23 @@ import { idempotencyMiddleware } from "@/middleware/idempotency.middleware";
 import {
   errorResponseSchema,
   idParamSchema,
+  todoCreateSchema,
   todoResponseSchema,
+  todoUpdateSchema,
   todosResponseSchema,
 } from "@/validation";
-import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 
 const todoRoutes = new OpenAPIHono();
 
-todoRoutes.use("*", authMiddleware);
-
 const bearerAuth = [{ bearerAuth: [] }];
 
-const getAllRoute = createRoute({
+export const getAllRoute = createRoute({
   method: "get",
   path: "/",
   tags: ["Todo"],
   summary: "List todos",
+  middleware: [authMiddleware] as const,
   security: bearerAuth,
   responses: {
     200: {
@@ -33,22 +34,18 @@ const getAllRoute = createRoute({
   },
 });
 
-const createTodoRoute = createRoute({
+export const createTodoRoute = createRoute({
   method: "post",
   path: "/",
   tags: ["Todo"],
   summary: "Create todo",
+  middleware: [authMiddleware, idempotencyMiddleware] as const,
   security: bearerAuth,
   request: {
     body: {
       content: {
         "application/json": {
-          schema: z
-            .object({
-              task: z.string().min(3).optional(),
-              title: z.string().min(1).optional(),
-            })
-            .openapi("TodoCreate"),
+          schema: todoCreateSchema,
         },
       },
       required: true,
@@ -66,11 +63,12 @@ const createTodoRoute = createRoute({
   },
 });
 
-const getOneRoute = createRoute({
+export const getOneRoute = createRoute({
   method: "get",
   path: "/{id}",
   tags: ["Todo"],
   summary: "Get todo",
+  middleware: [authMiddleware] as const,
   security: bearerAuth,
   request: {
     params: idParamSchema,
@@ -87,23 +85,19 @@ const getOneRoute = createRoute({
   },
 });
 
-const updateRoute = createRoute({
+export const updateRoute = createRoute({
   method: "put",
   path: "/{id}",
   tags: ["Todo"],
   summary: "Update todo",
+  middleware: [authMiddleware, idempotencyMiddleware] as const,
   security: bearerAuth,
   request: {
     params: idParamSchema,
     body: {
       content: {
         "application/json": {
-          schema: z
-            .object({
-              title: z.string().min(1).optional(),
-              completed: z.boolean().optional(),
-            })
-            .openapi("TodoUpdate"),
+          schema: todoUpdateSchema,
         },
       },
     },
@@ -120,11 +114,12 @@ const updateRoute = createRoute({
   },
 });
 
-const deleteRoute = createRoute({
+export const deleteRoute = createRoute({
   method: "delete",
   path: "/{id}",
   tags: ["Todo"],
   summary: "Delete todo",
+  middleware: [authMiddleware, idempotencyMiddleware] as const,
   security: bearerAuth,
   request: {
     params: idParamSchema,
@@ -141,22 +136,10 @@ const deleteRoute = createRoute({
   },
 });
 
-todoRoutes.openapi(getAllRoute, TodoController.getAll as any);
-todoRoutes.openapi(
-  createTodoRoute,
-  idempotencyMiddleware as any,
-  TodoController.create as any,
-);
-todoRoutes.openapi(getOneRoute, TodoController.getOne as any);
-todoRoutes.openapi(
-  updateRoute,
-  idempotencyMiddleware as any,
-  TodoController.update as any,
-);
-todoRoutes.openapi(
-  deleteRoute,
-  idempotencyMiddleware as any,
-  TodoController.delete as any,
-);
+todoRoutes.openapi(getAllRoute, TodoController.getAll);
+todoRoutes.openapi(createTodoRoute, TodoController.create);
+todoRoutes.openapi(getOneRoute, TodoController.getOne);
+todoRoutes.openapi(updateRoute, TodoController.update);
+todoRoutes.openapi(deleteRoute, TodoController.delete);
 
 export default todoRoutes;

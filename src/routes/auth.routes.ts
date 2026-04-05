@@ -10,7 +10,7 @@ import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 
 const authRoutes = new OpenAPIHono();
 
-const signupRoute = createRoute({
+export const signupRoute = createRoute({
   method: "post",
   path: "/signup",
   tags: ["Auth"],
@@ -33,7 +33,7 @@ const signupRoute = createRoute({
   },
 });
 
-const loginRoute = createRoute({
+export const loginRoute = createRoute({
   method: "post",
   path: "/login",
   tags: ["Auth"],
