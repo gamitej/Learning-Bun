@@ -4,12 +4,37 @@ import pino from "pino";
 const isProduction = env.NODE_ENV === "production";
 const level = env.LOG_LEVEL ?? "info";
 
+/**
+ * Redact sensitive fields before they reach any log sink.
+ * Covers top-level keys, one-level-deep nested keys, and common request header paths.
+ */
+const REDACTED_PATHS = [
+  "password",
+  "passwordRaw",
+  "passwordHash",
+  "secret",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "*.password",
+  "*.passwordRaw",
+  "*.passwordHash",
+  "*.secret",
+  "*.token",
+  "*.accessToken",
+  "*.refreshToken",
+  '*.headers["authorization"]',
+  '*.headers["x-api-key"]',
+  "*.headers.cookie",
+];
+
 const prettyTarget = {
   target: "pino-pretty",
   options: {
     colorize: true,
     translateTime: "SYS:yyyy-mm-dd HH:MM:ss",
     ignore: "pid,hostname",
+    messageFormat: "{msg}",
   },
   level,
 };
@@ -55,39 +80,23 @@ function buildTransport():
 
 export const logger = pino({
   level,
-  transport: buildTransport(),
+  /**
+   * Normalise error objects so `err.stack`, `err.type`, and `err.message`
+   * are always present in log records, regardless of how errors are passed.
+   */
+  serializers: {
+    err: pino.stdSerializers.err,
+    error: pino.stdSerializers.err,
+  },
+  redact: {
+    paths: REDACTED_PATHS,
+    censor: "[REDACTED]",
+  },
   base: {
     service: "backend-api",
+    env: env.NODE_ENV,
   },
+  transport: buildTransport(),
 });
-
-export const logRequest = (c: any, meta = {}) => {
-  logger.info(
-    {
-      method: c.req.method,
-      url: c.req.url,
-      ip: c.req.header("x-forwarded-for") || "127.0.0.1",
-      userAgent: c.req.header("user-agent"),
-      ...meta,
-    },
-    "HTTP Request",
-  );
-};
-
-export const logResponse = (c: any, duration: number, meta = {}) => {
-  const statusCode = c.res.status;
-  const level = statusCode >= 400 ? "warn" : "info";
-
-  logger[level](
-    {
-      method: c.req.method,
-      url: c.req.url,
-      statusCode,
-      duration: `${duration}ms`,
-      ...meta,
-    },
-    "HTTP Response",
-  );
-};
 
 export default logger;

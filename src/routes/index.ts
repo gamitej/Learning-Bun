@@ -13,7 +13,7 @@ export function registerRoutes(app: OpenAPIHono) {
       await db.execute(sql`SELECT 1`);
       return c.json({ status: "ok", db: "connected" });
     } catch {
-      logger.error("Health check: database unreachable");
+      logger.error("health check: database unreachable");
       return c.json({ status: "degraded", db: "disconnected" }, 503);
     }
   });

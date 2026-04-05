@@ -25,7 +25,7 @@ export const idempotencyMiddleware = async (c: Context, next: Next) => {
     });
 
     if (existing?.response) {
-      logger.info({ key }, "🎯 Idempotency Hit: Returning cached response");
+      logger.info({ key }, "idempotency hit: returning cached response");
       return c.json(existing.response, 200);
     }
 
@@ -54,7 +54,7 @@ export const idempotencyMiddleware = async (c: Context, next: Next) => {
     await next();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ error: msg, key }, "❌ Idempotency Middleware Error");
+    logger.error({ error: msg, key }, "idempotency middleware error");
     return await next();
   }
 };

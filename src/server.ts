@@ -1,9 +1,9 @@
 import { env } from "@/config/env";
+import { requestLoggerMiddleware } from "@/middleware/request-logger.middleware";
 import { Errors, globalErrorHandler } from "@/utils/errors";
 import { logger } from "@/utils/logger";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
-import { logger as honoLogger } from "hono/logger";
 import { startDatabase, stopDatabase } from "./database";
 import routes from "./routes";
 
@@ -29,7 +29,7 @@ const app = new OpenAPIHono({
  * Middleware
  */
 app.use("*", cors());
-app.use("*", honoLogger());
+app.use("*", requestLoggerMiddleware);
 
 /**
  * Routes

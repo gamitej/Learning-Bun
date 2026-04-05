@@ -20,6 +20,7 @@ export const AuthController = {
     });
 
     if (!user) {
+      logger.warn({ username }, "User creation failed");
       return sendError(
         c,
         Errors.USER_CREATION_FAILED.status,
@@ -28,7 +29,6 @@ export const AuthController = {
     }
 
     logger.info({ userId: user.id, username: user.username }, "User created");
-
     return sendResponse(c, 201, true, "User created successfully", {
       id: user.id,
       username: user.username,
@@ -54,8 +54,7 @@ export const AuthController = {
 
     const token = await signJwt({ sub: user.id, username: user.username });
 
-    logger.info({ userId: user.id }, "User logged in");
-
+    logger.info({ userId: user.id, username: user.username }, "User logged in");
     return sendResponse(c, 200, true, "Login successful", { token });
   }) as RouteHandler<typeof loginRoute>,
 };
