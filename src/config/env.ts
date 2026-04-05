@@ -12,6 +12,7 @@ const envSchema = z.object({
   IDEMPOTENCY_EXPIRES_HOURS: z.coerce.number().default(24),
 
   LOG_LEVEL: z.enum(["info", "error", "warn", "debug"]).default("info"),
+  LOKI_URL: z.string().url().optional(),
 });
 
 const result = envSchema.safeParse(process.env);

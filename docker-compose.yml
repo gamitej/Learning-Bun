@@ -10,6 +10,8 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      loki:
+        condition: service_started
 
   database:
     image: postgres:16-alpine
@@ -27,5 +29,36 @@ services:
       timeout: 5s
       retries: 5
 
+  loki:
+    image: grafana/loki:3.3.2
+    ports:
+      - "${LOKI_PORT}:${LOKI_PORT}"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./config/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${LOKI_PORT}/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  loki_data:
+  grafana_data:
