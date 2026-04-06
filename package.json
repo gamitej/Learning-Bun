@@ -20,7 +20,15 @@
     "lint:fix": "biome check --write ./src",
     "format": "biome format --write ./src",
     "typecheck": "tsc --noEmit",
-    "clean:idempotency": "NODE_ENV=production bun src/scripts/cleanup-idempotency.ts"
+    "clean:idempotency": "NODE_ENV=production bun src/scripts/cleanup-idempotency.ts",
+    "docker:up": "docker compose --env-file .env.development up -d",
+    "docker:up:build": "docker compose --env-file .env.development up -d --build",
+    "docker:down": "docker compose --env-file .env.development down",
+    "docker:down:v": "docker compose --env-file .env.development down -v",
+    "docker:test:up": "docker compose --env-file .env.test up -d",
+    "docker:test:up:build": "docker compose --env-file .env.test up -d --build",
+    "docker:test:down": "docker compose --env-file .env.test down",
+    "docker:test:down:v": "docker compose --env-file .env.test down -v"
   },
   "dependencies": {
     "@hono/zod-openapi": "0.18.3",

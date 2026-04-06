@@ -1,5 +1,96 @@
 ## Bun Todo List
 
+- To preview the README.md use command + shift + v
+
+## Project Setup
+
+### Prerequisites
+- [Bun](https://bun.sh) >= 1.0
+- [Docker](https://www.docker.com) & Docker Compose
+
+### Install dependencies
+
+```bash
+bun install
+```
+
+### Configure environment
+
+Copy the development env file and fill in any secrets:
+
+```bash
+cp .env.development .env.development.local   # override locally without touching git
+```
+
+> `.env*` files are git-ignored. See the [Environment Configuration](#environment-configuration) section below for details.
+
+### Start (Docker — recommended)
+
+Starts the API, Postgres, Loki, and Grafana together:
+
+```bash
+# Development
+bun run docker:up           # start (existing image)
+bun run docker:up:build     # start with a fresh build
+
+# Test
+bun run docker:test:up
+bun run docker:test:up:build
+```
+
+### Start (local, no Docker)
+
+Make sure a local Postgres instance is running, then:
+
+```bash
+bun run dev
+```
+
+### Stop
+
+```bash
+# Development
+bun run docker:down         # stop containers, keep volumes
+bun run docker:down:v       # stop and delete all data volumes
+
+# Test
+bun run docker:test:down
+bun run docker:test:down:v
+```
+
+---
+
+## Service URLs (development defaults)
+
+| Service        | URL                                           |
+| -------------- | --------------------------------------------- |
+| API            | <http://localhost:3000>                       |
+| Health check   | <http://localhost:3000/health>                |
+| Swagger UI     | <http://localhost:3000/api/docs>              |
+| OpenAPI JSON   | <http://localhost:3000/api/docs/openapi.json> |
+| Grafana        | <http://localhost:3001>  (admin / admin)      |
+| Loki           | <http://localhost:3100>                       |
+
+---
+
+## Environment Configuration
+
+Bun automatically loads the correct `.env` file based on `NODE_ENV` before your process starts, so `src/config/env.ts` never needs any file-loading logic — it simply validates whatever is already in `process.env` via Zod.
+
+| `NODE_ENV`    | File loaded         | Used by              |
+| ------------- | ------------------- | -------------------- |
+| `development` | `.env.development`  | `bun run dev`        |
+| `test`        | `.env.test`         | `bun run test`       |
+| `production`  | `.env`              | `bun run start`      |
+
+**Bun's loading priority (highest → lowest):**
+1. `.env.<NODE_ENV>.local`
+2. `.env.local` _(skipped when `NODE_ENV=test`)_
+3. `.env.<NODE_ENV>` — e.g. `.env.development` or `.env.test`
+4. `.env`
+
+> All `.env*` files are git-ignored. Copy the relevant file from a teammate or your secrets manager when setting up a new environment.
+
 ### Git Pre-commit hook husky
 
 ```bash
@@ -79,3 +170,60 @@ type(scope): description
 - fix(api): resolve memory leak in search
 - perf(db): add index to student_id
 - chore: add commitlint to husky hooks
+
+---
+
+## Available Scripts
+
+### Development
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run dev` | Start server with hot-reload (`NODE_ENV=development`) |
+| `bun run start` | Start server in production mode |
+| `bun run build` | Bundle to `dist/` |
+| `bun run typecheck` | TypeScript type-check (no emit) |
+
+### Docker — Development
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run docker:up` | Start all services with `.env.development` |
+| `bun run docker:up:build` | Same, but rebuild the image first |
+| `bun run docker:down` | Stop containers, keep volumes |
+| `bun run docker:down:v` | Stop containers and delete all volumes |
+
+### Docker — Test
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run docker:test:up` | Start all services with `.env.test` |
+| `bun run docker:test:up:build` | Same, but rebuild the image first |
+| `bun run docker:test:down` | Stop containers, keep volumes |
+| `bun run docker:test:down:v` | Stop containers and delete all volumes |
+
+### Testing
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run test` | Run all tests (`NODE_ENV=test`) |
+| `bun run test:unit` | Run unit tests only |
+| `bun run test:watch` | Run tests in watch mode |
+| `bun run stress` | Run k6 stress tests |
+
+### Database
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run db:push` | Push schema changes directly (no migration file) |
+| `bun run db:migrate` | Run pending migrations |
+| `bun run db:generate` | Generate migration files from schema |
+| `bun run db:studio` | Open Drizzle Studio |
+
+### Code Quality
+
+| Command | Description |
+| ------- | ----------- |
+| `bun run lint` | Check code with Biome |
+| `bun run lint:fix` | Auto-fix lint issues |
+| `bun run format` | Format code with Biome |

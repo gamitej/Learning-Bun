@@ -3,7 +3,7 @@ services:
     build: .
     ports:
       - "${PORT}:${PORT}"
-    env_file: .env
+    env_file: .env.development
     volumes:
       - ./src:/app/src
     command: sh -c "bunx drizzle-kit push --config=src/config/drizzle.config.ts --force && bun --hot src/server.ts"

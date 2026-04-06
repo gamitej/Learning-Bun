@@ -1,16 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
 
-mock.module("@/config/env", () => ({
-  env: {
-    JWT_SECRET: "test-secret-key-that-is-at-least-32-chars-long",
-    NODE_ENV: "test",
-    PORT: 3000,
-    DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    IDEMPOTENCY_EXPIRES_HOURS: 24,
-    LOG_LEVEL: "info",
-  },
-}));
-
 mock.module("@/utils/idempotency", () => ({
   storeResponse: mock(async () => {}),
   clearRecord: mock(async () => {}),

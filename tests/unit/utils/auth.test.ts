@@ -1,16 +1,3 @@
-import { mock } from "bun:test";
-
-mock.module("@/config/env", () => ({
-  env: {
-    JWT_SECRET: "test-secret-key-that-is-at-least-32-chars-long",
-    NODE_ENV: "test",
-    PORT: 3000,
-    DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    IDEMPOTENCY_EXPIRES_HOURS: 24,
-    LOG_LEVEL: "info",
-  },
-}));
-
 import { describe, expect, it } from "bun:test";
 import { hashPassword, signJwt, verifyJwt, verifyPassword } from "@/utils/auth";
 
