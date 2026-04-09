@@ -39,8 +39,25 @@ export const startDatabase = async (): Promise<void> => {
   database = drizzle(queryClient, { schema });
   db = database;
 
-  await queryClient`SELECT 1`;
-  logger.info(`Database connected [${env.NODE_ENV.toUpperCase()}]`);
+  const maxAttempts = 10;
+  const delayMs = 3000;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await queryClient`SELECT 1`;
+      logger.info(`Database connected [${env.NODE_ENV.toUpperCase()}]`);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) {
+        throw new Error(
+          `Database not reachable after ${maxAttempts} attempts: ${err}`,
+        );
+      }
+      logger.warn(
+        `Database connection attempt ${attempt}/${maxAttempts} failed — retrying in ${delayMs}ms`,
+      );
+      await Bun.sleep(delayMs);
+    }
+  }
 };
 
 export const stopDatabase = async (): Promise<void> => {
