@@ -35,13 +35,11 @@ jobs:
 
     env:
       NODE_ENV: test
-      # Points to the service container above — never touches the VPS.
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # JWT_SECRET must be ≥32 chars; using a fixed CI-only value is safe here.
+      # Built from individual secrets so the port is always 5432 (service container).
+      DATABASE_URL: postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       LOG_LEVEL: error
       PORT: 3000
-      # Opt into Node.js 24 for all actions to avoid Node.js 20 deprecation warnings.
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
