@@ -18,16 +18,8 @@ export function getDb(): PostgresJsDatabase<typeof schema> {
   return database;
 }
 
-export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
-  get(_target, prop) {
-    const dbInstance = getDb();
-    const value = Reflect.get(dbInstance, prop, dbInstance);
-    if (typeof value === "function") {
-      return value.bind(dbInstance);
-    }
-    return value;
-  },
-});
+export let db: PostgresJsDatabase<typeof schema> =
+  null as unknown as PostgresJsDatabase<typeof schema>;
 
 export const startDatabase = async (): Promise<void> => {
   queryClient = isProd
@@ -45,6 +37,7 @@ export const startDatabase = async (): Promise<void> => {
       });
 
   database = drizzle(queryClient, { schema });
+  db = database;
 
   await queryClient`SELECT 1`;
   logger.info(`Database connected [${env.NODE_ENV.toUpperCase()}]`);
@@ -59,6 +52,7 @@ export const stopDatabase = async (): Promise<void> => {
     await queryClient.end();
     queryClient = null;
     database = null;
+    db = null as unknown as PostgresJsDatabase<typeof schema>;
     logger.info("Database connection closed");
   } catch (error) {
     logger.error({ err: error }, "Error closing database connection");
