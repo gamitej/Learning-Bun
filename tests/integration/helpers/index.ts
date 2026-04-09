@@ -1,11 +1,11 @@
-import { db } from "@/database";
+import { getDb } from "@/database";
 import { UserHelpers, todos, users } from "@/database/schema";
 import { signJwt } from "@/utils/auth";
 
 export async function setupTestContext(username: string) {
-  await db.delete(users);
+  await getDb().delete(users);
 
-  const user = await UserHelpers.create(db, {
+  const user = await UserHelpers.create(getDb(), {
     username,
     passwordRaw: "test-password",
   });
@@ -57,7 +57,7 @@ export async function createTestTodo(
   userId: number,
   overrides: Partial<{ title: string; completed: boolean }> = {},
 ) {
-  const [todo] = await db
+  const [todo] = await getDb()
     .insert(todos)
     .values({
       title: "Test todo",

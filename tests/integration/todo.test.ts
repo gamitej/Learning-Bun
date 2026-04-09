@@ -13,7 +13,7 @@ mock.module("@/utils/logger", () => {
 // ── Imports ───────────────────────────────────────────────────────────────
 
 import { createApp } from "@/app";
-import { db, startDatabase, stopDatabase } from "@/database";
+import { getDb, startDatabase, stopDatabase } from "@/database";
 import { todos, users } from "@/database/schema";
 import { Errors } from "@/utils/errors";
 import { createTestTodo, json, jsonReq, setupTestContext } from "./helpers";
@@ -30,7 +30,7 @@ let authed: Awaited<ReturnType<typeof setupTestContext>>["authed"];
 
 beforeAll(async () => {
   await startDatabase();
-  await db.delete(todos);
+  await getDb().delete(todos);
   const ctx = await setupTestContext("alice");
   userId = ctx.user.id;
   authHeader = ctx.authHeader;
@@ -38,8 +38,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(todos);
-  await db.delete(users);
+  await getDb().delete(todos);
+  await getDb().delete(users);
   await stopDatabase();
 });
 
@@ -69,7 +69,7 @@ describe("GET /api/todos", () => {
   });
 
   it("returns 200 with all todos belonging to the authenticated user", async () => {
-    await db.insert(todos).values([
+    await getDb().insert(todos).values([
       { title: "Buy milk", completed: false, user_id: userId },
       { title: "Walk dog", completed: true, user_id: userId },
     ]);
@@ -83,7 +83,7 @@ describe("GET /api/todos", () => {
     expect(body.data[0].title).toBe("Buy milk");
     expect(body.data[1].title).toBe("Walk dog");
 
-    await db.delete(todos);
+    await getDb().delete(todos);
   });
 });
 
@@ -149,7 +149,7 @@ describe("GET /api/todos/:id", () => {
   });
 
   afterAll(async () => {
-    await db.delete(todos);
+    await getDb().delete(todos);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -196,7 +196,7 @@ describe("PUT /api/todos/:id", () => {
   });
 
   afterAll(async () => {
-    await db.delete(todos);
+    await getDb().delete(todos);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -266,7 +266,7 @@ describe("DELETE /api/todos/:id", () => {
   });
 
   afterAll(async () => {
-    await db.delete(todos);
+    await getDb().delete(todos);
   });
 
   it("returns 401 when not authenticated", async () => {
