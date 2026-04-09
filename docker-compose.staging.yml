@@ -1,0 +1,86 @@
+# docker-compose.staging.yml
+# Purpose: Full-stack staging environment — runs on the staging VPS.
+# Differences from docker-compose.yml (dev):
+#   - No source volume mounts (runs the built image, not hot-reload)
+#   - NODE_ENV=staging / production build command (no `bun --hot`)
+#   - Persistent named volumes so staging data survives container restarts
+#   - restart: unless-stopped on all services
+#   - Schema push handled by the deploy script in stage.yml before `up`, so the
+#     backend container only starts the server (no race with push on startup)
+#
+# Usage on VPS (called by stage.yml):
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging \
+#     up -d --build --remove-orphans
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT}:${PORT}"
+    env_file: .env.staging
+    # No ./src volume mount — the image contains the built source.
+    # Schema was already pushed by the CI deploy step; just start the server.
+    command: sh -c "bun run src/server.ts"
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+      loki:
+        condition: service_started
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Bind to localhost only — do not expose Postgres publicly on the VPS.
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    volumes:
+      # Persistent volume so staging data survives restarts/redeploys.
+      - staging_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  loki:
+    image: grafana/loki:3.3.2
+    ports:
+      - "127.0.0.1:${LOKI_PORT}:${LOKI_PORT}"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./config/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - staging_loki_data:/loki
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:${LOKI_PORT}/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - staging_grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
+
+volumes:
+  staging_pgdata:
+  staging_loki_data:
+  staging_grafana_data:

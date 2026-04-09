@@ -8,6 +8,7 @@
     "dev": "NODE_ENV=development bun --hot src/server.ts",
     "build": "bun build ./src/server.ts --outdir ./dist --target bun --minify",
     "db:push": "bunx drizzle-kit push",
+    "db:push:test": "set -a && . .env.test && set +a && bunx drizzle-kit push --config=src/config/drizzle.config.ts --force",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:generate": "bunx drizzle-kit generate",
     "db:studio": "bunx drizzle-kit studio",
@@ -15,6 +16,8 @@
     "test": "NODE_ENV=test bun test",
     "test:unit": "NODE_ENV=test bun test ./tests/unit",
     "test:integration": "NODE_ENV=test bun test ./tests/integration",
+    "test:local": "bun run docker:test:up && bun run db:push:test && bun run test:integration; bun run docker:test:down",
+    "test:all": "bun run test:unit && bun run test:local",
     "test:watch": "NODE_ENV=test bun test --watch",
     "stress": "k6 run tests/stress.js",
     "lint": "biome check ./src",
@@ -26,10 +29,8 @@
     "docker:up:build": "docker compose --env-file .env.development up -d --build",
     "docker:down": "docker compose --env-file .env.development down",
     "docker:down:v": "docker compose --env-file .env.development down -v",
-    "docker:test:up": "docker compose --env-file .env.test up -d",
-    "docker:test:up:build": "docker compose --env-file .env.test up -d --build",
-    "docker:test:down": "docker compose --env-file .env.test down",
-    "docker:test:down:v": "docker compose --env-file .env.test down -v"
+    "docker:test:up": "docker compose -f docker-compose.test.yml --env-file .env.test up -d --wait",
+    "docker:test:down": "docker compose -f docker-compose.test.yml --env-file .env.test down --remove-orphans"
   },
   "dependencies": {
     "@hono/zod-openapi": "0.18.3",

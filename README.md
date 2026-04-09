@@ -208,8 +208,16 @@ type(scope): description
 | ------- | ----------- |
 | `bun run test` | Run all tests (`NODE_ENV=test`) |
 | `bun run test:unit` | Run unit tests only |
+| `bun run test:integration` | Run integration tests only (requires DB already running) |
+| `bun run test:local` | Integration tests with full Docker lifecycle — starts test DB, pushes schema, runs tests, tears down |
+| `bun run test:all` | **Unit + integration** — runs unit tests first, then the full Docker lifecycle for integration tests |
 | `bun run test:watch` | Run tests in watch mode |
 | `bun run stress` | Run k6 stress tests |
+
+> **Integration tests require a running database.**  
+> - `test:local` — integration only, Docker managed automatically  
+> - `test:all` — unit + integration, Docker managed automatically  
+> - `docker:test:up` + `test:integration` — if you want the DB to stay up between runs
 
 ### Database
 

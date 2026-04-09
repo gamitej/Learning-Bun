@@ -1,0 +1,153 @@
+name: Staging Deploy
+
+# Triggers on pushes to the `develop` branch only.
+# This is the full staging pipeline: test with an isolated service container DB,
+# then deploy the whole stack to the staging VPS if tests pass.
+# The staging VPS uses its own .env.staging file — completely isolated from
+# the CI DB (ephemeral) and production DB.
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  # Cancel any in-progress staging deploy if a new commit is pushed.
+  group: staging-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Test
+  # GitHub Actions service container provides an isolated, ephemeral Postgres.
+  # No staging or production DB credentials are used here.
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Test (Service Container DB)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d ci_test_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      CI_TEST_DB_URL: postgresql://ci_user:ci_password@localhost:5432/ci_test_db
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      LOG_LEVEL: error
+      PORT: 3000
+
+    steps:
+      - name: 🚚 Checkout
+        uses: actions/checkout@v4
+
+      - name: ⚡️ Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 🧹 Lint (Biome)
+        run: bun run lint
+
+      - name: 🛡️ Type Check
+        run: bun run typecheck
+
+      - name: 🗄️ Push Schema → Service Container DB
+        run: bunx drizzle-kit push --config=src/config/drizzle.config.ts --force
+
+      - name: 🧪 Unit Tests
+        run: bun run test:unit
+
+      - name: 🧪 Integration Tests
+        run: bun run test:integration
+
+      - name: 🏗️ Build
+        run: bun run build
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy Full Stack to Staging VPS
+  # Runs ONLY when the test job above passes.
+  # SSHes into the staging VPS and brings the entire docker compose stack up,
+  # including the backend, database, Loki, and Grafana services.
+  # The staging VPS reads .env.staging which holds STAGING_DATABASE_URL,
+  # Loki/Grafana credentials, etc. — none of these ever appear in this file.
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: 🚀 Deploy to Staging VPS
+    needs: test
+    runs-on: ubuntu-latest
+
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_APP_URL }}
+
+    steps:
+      - name: 🔑 Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_VPS_HOST }}
+          username: ${{ secrets.STAGING_VPS_USER }}
+          key: ${{ secrets.STAGING_VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.STAGING_VPS_SSH_PORT }}
+          script: |
+            set -e
+
+            echo "──────────────────────────────────────────"
+            echo "  Deploying commit ${{ github.sha }} to staging"
+            echo "──────────────────────────────────────────"
+
+            cd ${{ secrets.STAGING_APP_DIR }}
+
+            # Pull latest code from develop branch
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+
+            # Install / update dependencies
+            bun install --frozen-lockfile
+
+            # Apply any schema changes to the staging DB.
+            # NODE_ENV=production so drizzle.config.ts picks up PROD_DATABASE_URL,
+            # which in .env.staging points to the staging Postgres — not production.
+            NODE_ENV=production bunx drizzle-kit push \
+              --config=src/config/drizzle.config.ts \
+              --force
+
+            # Bring up the full stack (backend + db + loki + grafana)
+            # --remove-orphans cleans up containers from old compose definitions
+            docker compose \
+              -f docker-compose.staging.yml \
+              --env-file .env.staging \
+              up -d \
+              --build \
+              --remove-orphans
+
+            echo "✅ Staging deploy complete"
+
+      - name: 🩺 Health Check
+        # Wait up to 60 s for the app to respond before marking the deploy successful.
+        run: |
+          echo "Waiting for staging app to become healthy..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.STAGING_APP_URL }}/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health check passed (HTTP 200)"
+              exit 0
+            fi
+            echo "  Attempt $i/12 — got HTTP $STATUS, retrying in 5s..."
+            sleep 5
+          done
+          echo "❌ Health check failed after 60s"
+          exit 1

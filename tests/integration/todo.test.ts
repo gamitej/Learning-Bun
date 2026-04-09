@@ -1,50 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, mock } from "bun:test";
-
-// ── DB mock state (module-level, read lazily via closures) ────────────────
-// The closure inside makeChain reads this at *test execution* time (after
-// module initialisation), so there is no temporal dead-zone issue.
-
-let dbResult: unknown = [];
-
-// ── Function declarations are JS-hoisted, so they are available when the
-//    mock.module factories run (which happens before regular module code). ──
-
-// biome-ignore lint/style/useConst: reassigned in beforeEach
-function makeChain(): unknown {
-  const proxy: Record<string | symbol, unknown> = new Proxy(
-    {} as Record<string, unknown>,
-    {
-      get(_target, prop) {
-        if (prop === "then") {
-          return (
-            resolve: (v: unknown) => unknown,
-            reject: (e: unknown) => unknown,
-          ) => Promise.resolve(dbResult).then(resolve, reject);
-        }
-        if (prop === "catch") {
-          return (reject: (e: unknown) => unknown) =>
-            Promise.resolve(dbResult).catch(reject);
-        }
-        if (prop === "finally") {
-          return (fin: () => void) => Promise.resolve(dbResult).finally(fin);
-        }
-        // All other property accesses (from(), where(), limit(), values(),
-        // returning(), set(), etc.) return a function that returns the same proxy,
-        // enabling unlimited method chaining.
-        return (..._args: unknown[]) => proxy;
-      },
-    },
-  );
-  return proxy;
-}
-
-function makeTableProxy(): unknown {
-  return new Proxy({} as Record<string, unknown>, {
-    get(): unknown {
-      return makeTableProxy();
-    },
-  });
-}
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
@@ -56,42 +10,13 @@ mock.module("@/utils/logger", () => {
   };
 });
 
-mock.module("@/utils/idempotency", () => ({
-  storeResponse: mock(async () => {}),
-  clearRecord: mock(async () => {}),
-}));
-
-mock.module("@/database/schema", () => ({
-  UserHelpers: {
-    create: mock(async () => null),
-    verify: mock(async () => null),
-  },
-  users: {},
-  todos: {},
-  idempotency: {},
-}));
-
-mock.module("@/database", () => ({
-  db: {
-    select: makeChain,
-    insert: makeChain,
-    update: makeChain,
-    delete: makeChain,
-    execute: makeChain,
-  },
-  getDb: () => ({ execute: makeChain }),
-  startDatabase: async () => {},
-  stopDatabase: async () => {},
-  todos: makeTableProxy(),
-  users: makeTableProxy(),
-  idempotency: makeTableProxy(),
-}));
-
 // ── Imports ───────────────────────────────────────────────────────────────
 
 import { createApp } from "@/app";
-import { signJwt } from "@/utils/auth";
+import { db, startDatabase, stopDatabase } from "@/database";
+import { todos, users } from "@/database/schema";
 import { Errors } from "@/utils/errors";
+import { createTestTodo, json, jsonReq, setupTestContext } from "./helpers";
 
 // ── App Setup ─────────────────────────────────────────────────────────────
 
@@ -100,42 +25,23 @@ const app = createApp();
 // ── Test Helpers ──────────────────────────────────────────────────────────
 
 let authHeader: string;
+let userId: number;
+let authed: Awaited<ReturnType<typeof setupTestContext>>["authed"];
 
 beforeAll(async () => {
-  const token = await signJwt({ sub: "1", username: "alice" });
-  authHeader = `Bearer ${token}`;
+  await startDatabase();
+  await db.delete(todos);
+  const ctx = await setupTestContext("alice");
+  userId = ctx.user.id;
+  authHeader = ctx.authHeader;
+  authed = ctx.authed;
 });
 
-beforeEach(() => {
-  dbResult = [];
+afterAll(async () => {
+  await db.delete(todos);
+  await db.delete(users);
+  await stopDatabase();
 });
-
-/** Unsigned request with JSON body */
-function jsonReq(method: string, body?: unknown) {
-  return {
-    method,
-    headers: { "Content-Type": "application/json" },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  };
-}
-
-/** Authenticated request with optional JSON body */
-function authed(method: string, body?: unknown) {
-  return {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authHeader,
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  };
-}
-
-const TODO = { id: 1, title: "Buy milk", completed: false, user_id: 1 };
-
-async function json(res: Response) {
-  return res.json() as Promise<Record<string, any>>;
-}
 
 // ── Tests: GET /api/todos ─────────────────────────────────────────────────
 
@@ -154,7 +60,6 @@ describe("GET /api/todos", () => {
   });
 
   it("returns 200 with an empty array when the user has no todos", async () => {
-    dbResult = [];
     const res = await app.request("/api/todos", authed("GET"));
 
     expect(res.status).toBe(200);
@@ -164,17 +69,21 @@ describe("GET /api/todos", () => {
   });
 
   it("returns 200 with all todos belonging to the authenticated user", async () => {
-    const todos = [
-      { id: 1, title: "Buy milk", completed: false, user_id: 1 },
-      { id: 2, title: "Walk dog", completed: true, user_id: 1 },
-    ];
-    dbResult = todos;
+    await db.insert(todos).values([
+      { title: "Buy milk", completed: false, user_id: userId },
+      { title: "Walk dog", completed: true, user_id: userId },
+    ]);
+
     const res = await app.request("/api/todos", authed("GET"));
 
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.success).toBe(true);
-    expect(body.data).toEqual(todos);
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0].title).toBe("Buy milk");
+    expect(body.data[1].title).toBe("Walk dog");
+
+    await db.delete(todos);
   });
 });
 
@@ -190,7 +99,6 @@ describe("POST /api/todos", () => {
   });
 
   it("returns 201 and uses title over task when both are provided", async () => {
-    dbResult = [TODO];
     const res = await app.request(
       "/api/todos",
       authed("POST", { task: "item", title: "Buy milk" }),
@@ -203,8 +111,6 @@ describe("POST /api/todos", () => {
   });
 
   it("returns 201 with the created todo when using the task field", async () => {
-    const created = { id: 2, title: "Walk dog", completed: false, user_id: 1 };
-    dbResult = [created];
     const res = await app.request(
       "/api/todos",
       authed("POST", { task: "Walk dog" }),
@@ -230,42 +136,39 @@ describe("POST /api/todos", () => {
     expect(res.status).toBe(400);
     expect((await json(res)).success).toBe(false);
   });
-
-  it("returns 500 when the database insert returns no rows", async () => {
-    dbResult = []; // empty means insert failed to return a record
-    const res = await app.request(
-      "/api/todos",
-      authed("POST", { task: "Buy milk" }),
-    );
-
-    expect(res.status).toBe(500);
-    expect((await json(res)).message).toBe(
-      Errors.TODO_CREATION_FAILED.message,
-    );
-  });
 });
 
 // ── Tests: GET /api/todos/:id ─────────────────────────────────────────────
 
 describe("GET /api/todos/:id", () => {
+  let todoId: number;
+
+  beforeAll(async () => {
+    const todo = await createTestTodo(userId, { title: "Buy milk" });
+    todoId = todo.id;
+  });
+
+  afterAll(async () => {
+    await db.delete(todos);
+  });
+
   it("returns 401 when not authenticated", async () => {
-    const res = await app.request("/api/todos/1");
+    const res = await app.request(`/api/todos/${todoId}`);
     expect(res.status).toBe(401);
   });
 
   it("returns 200 with the matching todo", async () => {
-    dbResult = [TODO];
-    const res = await app.request("/api/todos/1", authed("GET"));
+    const res = await app.request(`/api/todos/${todoId}`, authed("GET"));
 
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.success).toBe(true);
-    expect(body.data).toEqual(TODO);
+    expect(body.data.title).toBe("Buy milk");
+    expect(body.data.user_id).toBe(userId);
   });
 
   it("returns 404 when no matching todo exists", async () => {
-    dbResult = [];
-    const res = await app.request("/api/todos/999", authed("GET"));
+    const res = await app.request("/api/todos/999999", authed("GET"));
 
     expect(res.status).toBe(404);
     expect((await json(res)).message).toBe(Errors.TODO_NOT_FOUND.message);
@@ -285,19 +188,28 @@ describe("GET /api/todos/:id", () => {
 // ── Tests: PUT /api/todos/:id ─────────────────────────────────────────────
 
 describe("PUT /api/todos/:id", () => {
+  let todoId: number;
+
+  beforeAll(async () => {
+    const todo = await createTestTodo(userId, { title: "Buy milk" });
+    todoId = todo.id;
+  });
+
+  afterAll(async () => {
+    await db.delete(todos);
+  });
+
   it("returns 401 when not authenticated", async () => {
     const res = await app.request(
-      "/api/todos/1",
+      `/api/todos/${todoId}`,
       jsonReq("PUT", { title: "Updated" }),
     );
     expect(res.status).toBe(401);
   });
 
   it("returns 200 with the updated todo when changing title", async () => {
-    const updated = { ...TODO, title: "Buy oat milk" };
-    dbResult = [updated];
     const res = await app.request(
-      "/api/todos/1",
+      `/api/todos/${todoId}`,
       authed("PUT", { title: "Buy oat milk" }),
     );
 
@@ -308,10 +220,8 @@ describe("PUT /api/todos/:id", () => {
   });
 
   it("returns 200 when marking a todo as completed", async () => {
-    const updated = { ...TODO, completed: true };
-    dbResult = [updated];
     const res = await app.request(
-      "/api/todos/1",
+      `/api/todos/${todoId}`,
       authed("PUT", { completed: true }),
     );
 
@@ -320,9 +230,8 @@ describe("PUT /api/todos/:id", () => {
   });
 
   it("returns 404 when the todo does not exist", async () => {
-    dbResult = [];
     const res = await app.request(
-      "/api/todos/999",
+      "/api/todos/999999",
       authed("PUT", { title: "Updated" }),
     );
 
@@ -331,7 +240,7 @@ describe("PUT /api/todos/:id", () => {
   });
 
   it("returns 400 when the update body contains no valid fields", async () => {
-    const res = await app.request("/api/todos/1", authed("PUT", {}));
+    const res = await app.request(`/api/todos/${todoId}`, authed("PUT", {}));
 
     expect(res.status).toBe(400);
     expect((await json(res)).success).toBe(false);
@@ -349,24 +258,34 @@ describe("PUT /api/todos/:id", () => {
 // ── Tests: DELETE /api/todos/:id ──────────────────────────────────────────
 
 describe("DELETE /api/todos/:id", () => {
+  let todoId: number;
+
+  beforeAll(async () => {
+    const todo = await createTestTodo(userId, { title: "Buy milk" });
+    todoId = todo.id;
+  });
+
+  afterAll(async () => {
+    await db.delete(todos);
+  });
+
   it("returns 401 when not authenticated", async () => {
-    const res = await app.request("/api/todos/1", { method: "DELETE" });
+    const res = await app.request(`/api/todos/${todoId}`, { method: "DELETE" });
     expect(res.status).toBe(401);
   });
 
   it("returns 200 with the deleted todo", async () => {
-    dbResult = [TODO];
-    const res = await app.request("/api/todos/1", authed("DELETE"));
+    const res = await app.request(`/api/todos/${todoId}`, authed("DELETE"));
 
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.success).toBe(true);
-    expect(body.data).toEqual(TODO);
+    expect(body.data.title).toBe("Buy milk");
+    expect(body.data.user_id).toBe(userId);
   });
 
   it("returns 404 when the todo does not exist", async () => {
-    dbResult = [];
-    const res = await app.request("/api/todos/999", authed("DELETE"));
+    const res = await app.request("/api/todos/999999", authed("DELETE"));
 
     expect(res.status).toBe(404);
     expect((await json(res)).message).toBe(Errors.TODO_NOT_FOUND.message);

@@ -1,4 +1,4 @@
-name: Project CI Pipeline
+name: CI
 
 on:
   push:
@@ -7,8 +7,40 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Test
+  # Uses a GitHub Actions service container for Postgres.
+  # NO VPS credentials are used here — the DB is ephemeral and lives only for
+  # the duration of this job inside the GitHub Actions runner.
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
     runs-on: ubuntu-latest
+
+    # Spin up a fresh, isolated Postgres instance as a service container.
+    # This DB is destroyed automatically when the job finishes.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d ci_test_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      # Points to the service container above — never touches the VPS.
+      DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ci_test_db
+      # JWT_SECRET must be ≥32 chars; using a fixed CI-only value is safe here.
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      LOG_LEVEL: error
+      PORT: 3000
 
     steps:
       - name: 🚚 Checkout Repository
@@ -28,12 +60,43 @@ jobs:
       - name: 🛡️ Type Check (TSC)
         run: bun run typecheck
 
+      - name: 🗄️ Run Migrations (Service Container DB)
+        run: bunx drizzle-kit push --config=src/config/drizzle.config.ts --force
+
       - name: 🧪 Run Unit Tests
         run: bun run test:unit
+
+      - name: 🧪 Run Integration Tests
+        run: bun run test:integration
 
       - name: 🏗️ Verify Build
         run: bun run build
 
-      # Optional: Only run if you have a database container set up in GH Actions
-      # - name: 🗄️ Verify Database Migrations
-      #   run: bunx drizzle-kit check
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy to VPS (Staging/UAT)
+  # Runs ONLY if the test job passes. SSH into the VPS and pull latest code.
+  # The app on the VPS uses its own .env file — completely separate from CI.
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    # Only deploy on pushes to the main branch (not PRs, not develop)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: 🚀 Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          # The VPS reads its own .env.production file which contains PROD_DATABASE_URL.
+          # No test/CI DB credentials are involved here whatsoever.
+          script: |
+            set -e
+            cd ${{ secrets.VPS_APP_DIR }}
+            git pull origin main
+            bun install --frozen-lockfile
+            NODE_ENV=production bunx drizzle-kit push --config=src/config/drizzle.config.ts --force
+            docker compose --env-file .env.production up -d --build backend

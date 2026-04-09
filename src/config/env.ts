@@ -6,13 +6,7 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.coerce.number().default(3000),
 
-  PROD_DATABASE_URL: z.string().optional(),
-
-  LOCAL_DEV_DB_URL: z.string().optional(), // used in development when running locally
-  LOCAL_TEST_DB_URL: z.string().optional(), // used when running tests locally (e.g. via `test:integration` script)
-  VPS_TEST_DB_URL: z.string().optional(), // used in CI/CD pipeline (GitHub Actions) to point to a test DB on the VPS
-
-  GITHUB_ACTIONS: z.string().optional(), // set to "true" in CI environment (GitHub Actions) by default
+  DATABASE_URL: z.string().url(),
 
   JWT_SECRET: z.string().min(32),
   IDEMPOTENCY_EXPIRES_HOURS: z.coerce.number().default(24),
