@@ -131,7 +131,7 @@ describe("sendError", () => {
     })) as Response;
     expect(res.status).toBe(500);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body["extraMessage"]).toBe("Contact support");
+    expect(body.extraMessage).toBe("Contact support");
   });
 
   it("calls clearRecord when an idempotency key is present", async () => {
