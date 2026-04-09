@@ -1,4 +1,12 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import {
+  afterAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from "bun:test";
 
 // ── Mocks (declared before any imports so Bun can hoist them) ─────────────
 
@@ -10,34 +18,8 @@ mock.module("@/utils/logger", () => {
   };
 });
 
-mock.module("@/utils/idempotency", () => ({
-  storeResponse: mock(async () => {}),
-  clearRecord: mock(async () => {}),
-}));
-
-mock.module("@/database", () => ({
-  db: {},
-  getDb: () => ({}),
-  startDatabase: async () => {},
-  stopDatabase: async () => {},
-  todos: {},
-  users: {},
-  idempotency: {},
-}));
-
-mock.module("@/database/schema", () => ({
-  UserHelpers: {
-    create: mock(async () => null as unknown),
-    verify: mock(async () => null as unknown),
-  },
-  users: {},
-  todos: {},
-  idempotency: {},
-}));
-
 // ── Imports ───────────────────────────────────────────────────────────────
 
-import type { Mock } from "bun:test";
 import { createApp } from "@/app";
 import { UserHelpers } from "@/database/schema";
 import { Errors } from "@/utils/errors";
@@ -48,12 +30,13 @@ const app = createApp();
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-const mockCreate = UserHelpers.create as unknown as Mock<
-  () => Promise<unknown>
->;
-const mockVerify = UserHelpers.verify as unknown as Mock<
-  () => Promise<unknown>
->;
+const mockCreate = spyOn(UserHelpers, "create") as any;
+const mockVerify = spyOn(UserHelpers, "verify") as any;
+
+afterAll(() => {
+  mockCreate.mockRestore();
+  mockVerify.mockRestore();
+});
 
 function post(body: unknown) {
   return {
