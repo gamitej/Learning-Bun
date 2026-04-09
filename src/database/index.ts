@@ -4,17 +4,21 @@ import { type PostgresJsDatabase, drizzle } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";
 
+const isProd = env.NODE_ENV === "production";
+const isTest = env.NODE_ENV === "test";
+const isCI = env.GITHUB_ACTIONS === "true";
+
+function resolveConnectionString(): string {
+  if (isProd) return env.PROD_DATABASE_URL ?? ""; // in production, we expect the connection string
+  if (isCI) return env.VPS_TEST_DB_URL ?? ""; // in CI/CD pipeline, use the VPS test database
+  if (isTest) return env.LOCAL_TEST_DB_URL ?? ""; // when running tests locally, use the local test database
+  return env.LOCAL_DEV_DB_URL ?? ""; // in development, use the local development database
+}
+
+const envLabel = isProd ? "PROD" : isCI ? "CI" : isTest ? "TEST" : "DEV";
+
 let queryClient: Sql | null = null;
 let database: PostgresJsDatabase<typeof schema> | null = null;
-
-function createClient(): Sql {
-  return postgres(env.DATABASE_URL, {
-    max: 10,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    max_lifetime: 60 * 30,
-  });
-}
 
 export function getDb(): PostgresJsDatabase<typeof schema> {
   if (!database) {
@@ -25,54 +29,46 @@ export function getDb(): PostgresJsDatabase<typeof schema> {
   return database;
 }
 
-/**
- * Proxy that lazily delegates to getDb() — keeps existing `db` import working
- * everywhere without changing every file.
- */
 export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
   get(_target, prop, receiver) {
     return Reflect.get(getDb(), prop, receiver);
   },
 });
 
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 2000;
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export const startDatabase = async (): Promise<void> => {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      queryClient = createClient();
-      database = drizzle(queryClient, { schema });
+  const connectionString = resolveConnectionString();
 
-      await queryClient`SELECT 1`;
-      logger.info("Database connection established");
-      return;
-    } catch (error) {
-      logger.warn(
-        { attempt, maxRetries: MAX_RETRIES, err: error },
-        "Database connection attempt failed",
-      );
-
-      if (queryClient) {
-        try {
-          await queryClient.end();
-        } catch {}
-        queryClient = null;
-        database = null;
-      }
-
-      if (attempt === MAX_RETRIES) {
-        logger.error("All database connection attempts exhausted");
-        throw error;
-      }
-
-      await sleep(RETRY_DELAY_MS * attempt);
-    }
+  if (!connectionString && connectionString !== "") {
+    logger.error(
+      `No database connection string provided for environment [${envLabel}]`,
+    );
+    throw new Error(
+      `Database connection string is required for environment [${envLabel}]`,
+    );
   }
+
+  let queryClient = null;
+
+  if (isProd) {
+    queryClient = postgres(connectionString, {
+      max: 50,
+      idle_timeout: 30,
+      connect_timeout: 10,
+      ssl: "require",
+    });
+  }
+
+  queryClient = postgres(connectionString, {
+    max: 5,
+    idle_timeout: 5,
+    connect_timeout: 10,
+    ssl: false,
+  });
+
+  database = drizzle(queryClient, { schema });
+
+  await queryClient`SELECT 1`;
+  logger.info(`Database connected [${envLabel}]`);
 };
 
 export const stopDatabase = async (): Promise<void> => {

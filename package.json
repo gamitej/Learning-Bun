@@ -14,6 +14,7 @@
     "prepare": "husky",
     "test": "NODE_ENV=test bun test",
     "test:unit": "NODE_ENV=test bun test ./tests/unit",
+    "test:integration": "NODE_ENV=test bun test ./tests/integration",
     "test:watch": "NODE_ENV=test bun test --watch",
     "stress": "k6 run tests/stress.js",
     "lint": "biome check ./src",
