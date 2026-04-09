@@ -6,4 +6,7 @@ bun run lint || { echo "❌ Linting failed. Run 'bun lint:fix' to resolve."; exi
 # 2. Run Unit Tests (Ensures logic is sound)
 bun test ./tests/unit || { echo "❌ Unit tests failed. Commit aborted."; exit 1; }
 
+# 3. Run Integration Tests (spins up test DB, runs tests, tears down)
+bun run test:integration || { echo "❌ Integration tests failed. Commit aborted."; exit 1; }
+
 echo "✅ All checks passed. Committing..."
