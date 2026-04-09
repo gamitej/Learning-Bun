@@ -127,5 +127,3 @@ describe("globalErrorHandler", () => {
     expect(body.success).toBe(false);
   });
 });
-
-// });
