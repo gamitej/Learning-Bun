@@ -1,6 +1,12 @@
 # Get the current branch name
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
+# Block direct pushes to main
+if [ "$current_branch" = "main" ]; then
+  echo "❌ You cannot push directly to main! Use a PR."
+  exit 1
+fi
+
 echo "🚀 Running Final Type Check on [$current_branch]..."
 
 bun x tsc --noEmit --skipLibCheck || { 

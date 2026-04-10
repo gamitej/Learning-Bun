@@ -16,12 +16,10 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.staging
     ports:
       - "${PORT}:${PORT}"
     env_file: .env.staging
-    # No ./src volume mount — the image contains the built source.
-    # Schema was already pushed by the CI deploy step; just start the server.
     command: sh -c "bun run src/server.ts"
     restart: unless-stopped
     depends_on:
