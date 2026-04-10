@@ -1,6 +1,6 @@
 ## Bun Todo List
 
-- To preview the README.md use command + shift + v
+- To preview the README.md use `command + shift + v`
 
 ## Project Setup
 
@@ -137,7 +137,6 @@ bun add -d lint-staged
   "*.{ts,tsx}": "bun run lint"
 }
 ```
-
 
 # 📜 Commit Message Standards
 
